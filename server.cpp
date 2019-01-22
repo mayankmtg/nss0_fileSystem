@@ -1,82 +1,125 @@
-#include<stdio.h>
-#include<stdlib.h>
-#include<sys/socket.h>
-#include<netinet/in.h>
-#include<string.h>
-#include <arpa/inet.h>
-#include <fcntl.h> // for open
-#include <unistd.h> // for close
+#include <string.h>
+#include <unistd.h>
+#include <stdio.h>
+#include <netdb.h>
 #include <sys/types.h>
-#include <sys/wait.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <iostream>
+#include <fstream>
+#include <strings.h>
+#include <stdlib.h>
+#include <string>
+#include <pthread.h>
+using namespace std;
 
-char client_message[2000];
-char buffer[1024];
+static int connFd;
 
-void socketThread(int  clientSocket){
-	printf("Connected\n");
-	char client_message[2000];
-	char buffer[1024];
-	int newSocket = clientSocket;
-	recv(newSocket , client_message , 2000 , 0);
-	// Send message to the client socket 
-	char *message = (char *)malloc(sizeof(client_message)+20);
-	strcpy(message,"Hello Client : ");
-	printf("%s",client_message );
-	strcat(message,client_message);
-	strcat(message,"\n");
-	strcpy(buffer,message);
-	free(message);
-	sleep(1);
-	send(newSocket,buffer,13,0);
-	printf("Exit socketThread \n");
-	close(newSocket);
+void send_string(char* char_array, string send_string, int size){
+	bzero(char_array, size+1);
+	strcpy(char_array, send_string.c_str());
+	write(connFd,char_array,size);
+}
+string recv_string(char* char_array, int size){
+	bzero(char_array, size+1);
+	read(connFd, char_array, size);
+	string curr_string(char_array);
+	return curr_string;
 }
 
-int main(){
-	int serverSocket, newSocket;
-	struct sockaddr_in serverAddr;
-	struct sockaddr_storage serverStorage;
-	socklen_t addr_size;
-	pid_t pid[50];
-	//Create the socket. 
-	serverSocket = socket(PF_INET, SOCK_STREAM, 0);
-	// Configure settings of the server address struct
-	// Address family = Internet 
-	serverAddr.sin_family = AF_INET;
-	//Set port number, using htons function to use proper byte order 
-	serverAddr.sin_port = htons(7799);
-	//Set IP address to localhost 
-	serverAddr.sin_addr.s_addr = inet_addr("127.0.0.1");
-	//Set all bits of the padding field to 0 
-	memset(serverAddr.sin_zero, '\0', sizeof serverAddr.sin_zero);
-	//Bind the address struct to the socket 
-	bind(serverSocket, (struct sockaddr *) &serverAddr, sizeof(serverAddr));
-	//Listen on the socket, with 40 max connection requests queued 
-	if(listen(serverSocket,50)==0){
-		printf("Listening\n");
-	}
-	else{
-		printf("Error\n");
-	}
-	pthread_t tid[60];
-	int i = 0;
-	while(1){
-		/*---- Accept call creates a new socket for the incoming connection ----*/
-		addr_size = sizeof serverStorage;
-		newSocket = accept(serverSocket, (struct sockaddr *) &serverStorage, &addr_size);
-		int pid_c = 0;
-		if ((pid_c = fork())==0){
-			socketThread(newSocket);
+
+void *serverHandler (void *dummyPt){
+	cout << "Thread No: " << pthread_self() << endl;
+	char test[300];
+	string login_string="Enter your username: ";
+	send_string(test, login_string, 300);
+
+	bool loop = false;
+	while(!loop){	
+		string tester = recv_string(test, 300);
+
+		if(tester == "ls"){
+			cout << "tested" <<endl;
+		}
+		else if(tester == "fput"){
+			cout << tester <<endl;
+		}
+		else if(tester == "fget"){
+			cout << tester <<endl;
+		}
+		else if(tester == "create_dir"){
+			cout << tester <<endl;
+		}
+		else if(tester == "cd"){
+			cout << tester <<endl;
+		}
+		else if(tester == "exit"){
+			break;
 		}
 		else{
-			pid[i++] = pid_c;
-			if( i >= 49){
-				i = 0;
-				while(i < 50)
-				waitpid(pid[i++], NULL, 0);
-				i = 0;
-			}
+			cout << tester << endl;
 		}
 	}
-	return 0;
+
+	cout << endl << "Closing thread and conn" << endl;
+	close(connFd);
+}
+
+int main(int argc, char* argv[]) {
+	int pId, portNo, listenFd;
+	socklen_t len;
+	bool loop = false;
+	struct sockaddr_in svrAdd, clntAdd;
+	pthread_t threadA[3];
+
+	if (argc < 2){
+		cerr << "Syntax : ./server <port>" << endl;
+		return 0;
+	}
+	portNo = atoi(argv[1]);
+	if((portNo > 65535) || (portNo < 2000)){
+		cerr << "Please enter a port number between 2000-65535" << endl;
+		return 0;
+	}
+
+	//create socket
+	listenFd = socket(AF_INET, SOCK_STREAM, 0);
+	if(listenFd < 0){
+		cerr << "Cannot Open Socket" << endl;
+		return 0;
+	}
+
+	bzero((char*) &svrAdd, sizeof(svrAdd));
+
+	svrAdd.sin_family = AF_INET;
+	svrAdd.sin_addr.s_addr = INADDR_ANY;
+	svrAdd.sin_port = htons(portNo);
+
+	//bind socket
+	if(bind(listenFd, (struct sockaddr *)&svrAdd, sizeof(svrAdd)) < 0){
+		cerr << "Cannot bind" << endl;
+		return 0;
+	}
+
+	listen(listenFd, 5);
+	len = sizeof(clntAdd);
+	int noThread = 0;
+	while (noThread < 3){
+		cout << "Listening" << endl;
+
+		connFd = accept(listenFd, (struct sockaddr *)&clntAdd, &len);
+		if (connFd < 0){
+			cerr << "Cannot Accept Connection" << endl;
+			return 0;
+		}
+		else{
+			cout << "Connection Successful" << endl;
+		}
+		pthread_create(&threadA[noThread], NULL, serverHandler, NULL); 
+		noThread++;
+	}
+
+	for(int i = 0; i < 3; i++){
+		pthread_join(threadA[i], NULL);
+	}
 }

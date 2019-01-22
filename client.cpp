@@ -1,66 +1,82 @@
+#include <string.h>
+#include <cstring>
+#include <unistd.h>
 #include <stdio.h>
+#include <netdb.h>
+#include <sys/types.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
-#include <string.h>
-#include <arpa/inet.h>
+#include <iostream>
+#include <fstream>
+#include <sstream>
+#include <iomanip>
+#include <strings.h>
 #include <stdlib.h>
-#include <fcntl.h> // for open
-#include <unistd.h> // for close
-#include<pthread.h>
+#include <string>
+#include <time.h>
+#include <vector>
 
+using namespace std;
 
+int main (int argc, char* argv[]){
+	int listenFd, portNo;
+	bool loop = false;
+	struct sockaddr_in svrAdd;
+	struct hostent *server;
+	if(argc < 3){
+		cerr<<"Syntax : ./client <host name> <port>"<<endl;
+		return 0;
+	}
+	portNo = atoi(argv[2]);
+	if((portNo > 65535) || (portNo < 2000)){
+		cerr<<"Please enter port number between 2000 - 65535"<<endl;
+		return 0;
+	}
+	//create client skt
+	listenFd = socket(AF_INET, SOCK_STREAM, 0);
+	if(listenFd < 0){
+		cerr << "Cannot open socket" << endl;
+		return 0;
+	}
 
-void * cientThread(void *arg)
-{
-  printf("In thread\n");
-  char message[1000];
-  char buffer[1024];
-  int clientSocket;
-  struct sockaddr_in serverAddr;
-  socklen_t addr_size;
-  // Create the socket. 
-  clientSocket = socket(PF_INET, SOCK_STREAM, 0);
-  //Configure settings of the server address
- // Address family is Internet 
-  serverAddr.sin_family = AF_INET;
-  //Set port number, using htons function 
-  serverAddr.sin_port = htons(7799);
- //Set IP address to localhost
-  serverAddr.sin_addr.s_addr = inet_addr("localhost");
-  memset(serverAddr.sin_zero, '\0', sizeof serverAddr.sin_zero);
-    //Connect the socket to the server using the address
-    addr_size = sizeof serverAddr;
-    connect(clientSocket, (struct sockaddr *) &serverAddr, addr_size);
-    strcpy(message,"Hello");
-   if( send(clientSocket , message , strlen(message) , 0) < 0)
-    {
-            printf("Send failed\n");
-    }
-    //Read the message from the server into the buffer
-    if(recv(clientSocket, buffer, 1024, 0) < 0)
-    {
-       printf("Receive failed\n");
-    }
-    //Print the received message
-    printf("Data received: %s\n",buffer);
-    close(clientSocket);
-    pthread_exit(NULL);
-}
-int main(){
-  int i = 0;
-  pthread_t tid[51];
-  while(i< 50)
-  {
-    if( pthread_create(&tid[i], NULL, cientThread, NULL) != 0 )
-           printf("Failed to create thread\n");
-    i++;
-  }
-  sleep(20);
-  i = 0;
-  while(i< 50)
-  {
-     pthread_join(tid[i++],NULL);
-     printf("%d:\n",i);
-  }
-  return 0;
+	server = gethostbyname(argv[1]);
+	if(server == NULL){
+		cerr << "Host does not exist" << endl;
+		return 0;
+	}
+
+	bzero((char *) &svrAdd, sizeof(svrAdd));
+	svrAdd.sin_family = AF_INET;
+
+	bcopy((char *)server->h_addr,(char *)&svrAdd.sin_addr.s_addr,server->h_length);
+
+	svrAdd.sin_port = htons(portNo);
+	int checker = connect(listenFd,(struct sockaddr *) &svrAdd, sizeof(svrAdd));
+	if (checker < 0){
+		cerr << "Cannot Connect!" << endl;
+		return 0;
+	}
+	// else connected
+	char s[300];
+	bzero(s, 301);
+	read(listenFd, s, 300);
+	string s_str(s);
+	cout << s_str << endl;
+
+	//send stuff to server
+	while(1){
+		bzero(s, 301);
+		cin.getline(s, 300);
+		write(listenFd, s, strlen(s));
+		s_str=s;
+		if(s_str=="exit"){
+			cout << "Closing Connection"<< endl;
+			break;
+		}
+		else{
+			cout << "Else Block"<< endl;
+		}
+	}
+	close(checker);
+	return 0;
 }
