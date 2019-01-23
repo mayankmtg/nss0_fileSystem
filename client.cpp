@@ -18,6 +18,21 @@
 
 using namespace std;
 
+
+void send_string(char* char_array, string send_string, int size,int listenFd){
+	bzero(char_array, size+1);
+	strcpy(char_array, send_string.c_str());
+	write(listenFd,char_array,size);
+}
+
+string recv_string(char* char_array, int size, int listenFd){
+	bzero(char_array, size+1);
+	read(listenFd, char_array, size);
+	string curr_string(char_array);
+	return curr_string;
+}
+
+
 int main (int argc, char* argv[]){
 	int listenFd, portNo;
 	bool loop = false;
@@ -57,25 +72,26 @@ int main (int argc, char* argv[]){
 		return 0;
 	}
 	// else connected
-	char s[300];
-	bzero(s, 301);
-	read(listenFd, s, 300);
-	string s_str(s);
-	cout << s_str << endl;
+	char test[300];
+	// collect 'response' from server
+	string response = recv_string(test, 300, listenFd);
+	cout << response;
 
-	//send stuff to server
+	//send 'message' to server
+	string message;
 	while(1){
-		bzero(s, 301);
-		cin.getline(s, 300);
-		write(listenFd, s, strlen(s));
-		s_str=s;
-		if(s_str=="exit"){
+		cin.getline(test, 300);
+		message = test;
+		send_string(test, message, 300, listenFd);
+		// write(listenFd, test, strlen(test));
+		// message=test;
+		if(message=="exit"){
 			cout << "Closing Connection"<< endl;
 			break;
 		}
-		else{
-			cout << "Else Block"<< endl;
-		}
+		response = recv_string(test, 300, listenFd);
+		cout << response;
+
 	}
 	close(checker);
 	return 0;

@@ -10,16 +10,19 @@
 #include <strings.h>
 #include <stdlib.h>
 #include <string>
+#include <sys/stat.h>
 #include <pthread.h>
 using namespace std;
 
 static int connFd;
-
+static string rootDir = "/home/mayank/Sem-8/NSS/nss0_fileSystem/root";
+static string homeDir = "/simple_home";
 void send_string(char* char_array, string send_string, int size){
 	bzero(char_array, size+1);
 	strcpy(char_array, send_string.c_str());
 	write(connFd,char_array,size);
 }
+
 string recv_string(char* char_array, int size){
 	bzero(char_array, size+1);
 	read(connFd, char_array, size);
@@ -27,41 +30,107 @@ string recv_string(char* char_array, int size){
 	return curr_string;
 }
 
+bool authenticate_user(string curr_user){
+	ifstream infile;
+	string user_file = "/users.txt";
+	user_file = rootDir + user_file;
+	infile.open(user_file.c_str());
+	string userLine;
+	while(infile >> userLine){
+		if(userLine == curr_user){
+			return true;
+		}
+	}
+	return false;
+
+}
+
+void *closing_seq (string message){
+	char test[300];
+	send_string(test, message, 300);
+	cout << endl << "Closing thread and conn" << endl;
+	close(connFd);
+	void *returnVal;
+	return returnVal;
+}
 
 void *serverHandler (void *dummyPt){
 	cout << "Thread No: " << pthread_self() << endl;
 	char test[300];
-	string login_string="Enter your username: ";
-	send_string(test, login_string, 300);
+	// 'message' to be sent to the server
+	string message="Enter your username: ";
+	send_string(test, message, 300);
+	string curr_dir = rootDir + homeDir;
+	
+	// 'response' received from the server
+	string response = recv_string(test, 300);
+	// 'response' contains username entered by client;
+	
+	string curr_user = response;
+	string curr_group = response; 
+	fstream outfile;
+	ifstream infile;
+
+	if(!authenticate_user(response)){
+		message = "User does not exist. Do you want to create a new one? (yes/no): ";
+		send_string(test, message, 300);
+		response = recv_string(test, 300);
+
+		if(response == "yes"){
+			string user_file = "/users.txt";
+			user_file = rootDir + user_file;
+			outfile.open(user_file.c_str(), ofstream::app);
+			outfile << curr_user << endl;
+			outfile.close();
+			// check = mkdir(rootDir+"/"+curr_user);
+			curr_dir = curr_dir + "/" + curr_user;
+			if(mkdir(curr_dir.c_str(), 0777) == -1){
+				return closing_seq("Error: Driectory Exists.");
+			}
+			string meta_file = rootDir + homeDir + "/" + curr_user + ".d";
+			outfile.open(meta_file.c_str(), ofstream::app);
+			outfile << curr_user << endl;
+			outfile << curr_group << endl;
+			outfile.close();
+		}
+		else{
+			return closing_seq("Closing Connection");
+		}
+	}
+	curr_dir = homeDir+"/"+curr_user;
+	// else user name typed exists
+	message = curr_dir + "$ ";
+	send_string(test, message, 300);
+
 
 	bool loop = false;
 	while(!loop){	
-		string tester = recv_string(test, 300);
+		response = recv_string(test, 300);
 
-		if(tester == "ls"){
+		if(response == "ls"){
 			cout << "tested" <<endl;
 		}
-		else if(tester == "fput"){
-			cout << tester <<endl;
+		else if(response == "fput"){
+			cout << response <<endl;
 		}
-		else if(tester == "fget"){
-			cout << tester <<endl;
+		else if(response == "fget"){
+			cout << response <<endl;
 		}
-		else if(tester == "create_dir"){
-			cout << tester <<endl;
+		else if(response == "create_dir"){
+			cout << response <<endl;
 		}
-		else if(tester == "cd"){
-			cout << tester <<endl;
+		else if(response == "cd"){
+			cout << response <<endl;
 		}
-		else if(tester == "exit"){
+		else if(response == "exit"){
 			break;
 		}
 		else{
-			cout << tester << endl;
+			cout << response << endl;
 		}
 	}
 
-	cout << endl << "Closing thread and conn" << endl;
+	cout << "Closing thread and conn" << endl;
 	close(connFd);
 }
 
