@@ -19,13 +19,15 @@
 using namespace std;
 
 
-void send_string(char* char_array, string send_string, int size,int listenFd){
+void send_string(string send_string, int size,int listenFd){
+	char char_array[size];
 	bzero(char_array, size+1);
 	strcpy(char_array, send_string.c_str());
 	write(listenFd,char_array,size);
 }
 
-string recv_string(char* char_array, int size, int listenFd){
+string recv_string(int size, int listenFd){
+	char char_array[size];
 	bzero(char_array, size+1);
 	read(listenFd, char_array, size);
 	string curr_string(char_array);
@@ -74,7 +76,10 @@ int main (int argc, char* argv[]){
 	// else connected
 	char test[300];
 	// collect 'response' from server
-	string response = recv_string(test, 300, listenFd);
+	string response;
+	bzero(test, 301);
+	recv(listenFd, test, 300, 0);
+	response = test;
 	cout << response;
 
 	//send 'message' to server
@@ -82,14 +87,16 @@ int main (int argc, char* argv[]){
 	while(1){
 		cin.getline(test, 300);
 		message = test;
-		send_string(test, message, 300, listenFd);
+		send(listenFd, (void *)message.c_str(), 300, 0);
 		// write(listenFd, test, strlen(test));
 		// message=test;
 		if(message=="exit"){
 			cout << "Closing Connection"<< endl;
 			break;
 		}
-		response = recv_string(test, 300, listenFd);
+		bzero(test, 301);
+		recv(listenFd, test, 300, 0);
+		response = test;
 		cout << response;
 
 	}

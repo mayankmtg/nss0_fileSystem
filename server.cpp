@@ -12,24 +12,14 @@
 #include <stdlib.h>
 #include <string>
 #include <sys/stat.h>
+#include <algorithm>
 #include <pthread.h>
 using namespace std;
 
-static int connFd;
+//static int connFd;
 static string rootDir = "/home/mayank/Sem-8/NSS/nss0_fileSystem/root";
 static string homeDir = "/simple_home";
-void send_string(char* char_array, string send_string, int size){
-	bzero(char_array, size+1);
-	strcpy(char_array, send_string.c_str());
-	write(connFd,char_array,size);
-}
 
-string recv_string(char* char_array, int size){
-	bzero(char_array, size+1);
-	read(connFd, char_array, size);
-	string curr_string(char_array);
-	return curr_string;
-}
 
 bool authenticate_user(string curr_user){
 	ifstream infile;
@@ -43,36 +33,54 @@ bool authenticate_user(string curr_user){
 		}
 	}
 	return false;
-
 }
 
 
-string getFileExtension(string Name) {
-	int pos = Name.find('.');
-	string sub = Name.substr(pos+1);
+string getFileExtension(string filename) {
+	string filename_copy(filename);
+	reverse(filename_copy.begin(), filename_copy.end());
+	int pos = filename_copy.find('.');
+	string sub = filename_copy.substr(0,pos);
+	reverse(sub.begin(), sub.end());
 	return sub;
 }
 
 
-void *closing_seq (string message){
+void *closing_seq (string message, int connFd){
 	char test[300];
-	send_string(test, message, 300);
+	send(connFd, (void *)message.c_str(), 300, 0);
 	cout << endl << "Closing thread and conn" << endl;
 	close(connFd);
 	void *returnVal;
 	return returnVal;
 }
 
-void *serverHandler (void *dummyPt){
+string getUserandGroup(string filename){
+	string returnString="";
+	ifstream infile;
+	filename = filename + ".m";
+	infile.open(filename.c_str());
+	string userLine;
+	while(infile >> userLine){
+		returnString +=userLine + " ";
+	}
+	returnString+="\n";
+	return returnString;
+}
+
+void *serverHandler (void* dummyPt){
 	cout << "Thread No: " << pthread_self() << endl;
 	char test[300];
 	// 'message' to be sent to the server
 	string message="Enter your username: ";
-	send_string(test, message, 300);
+	int connFd =  *((int *)dummyPt);
+	send(connFd, (void *)message.c_str(), 300, 0);
 	string curr_dir = rootDir + homeDir;
 	
 	// 'response' received from the server
-	string response = recv_string(test, 300);
+	bzero(test, 301);
+	recv(connFd, test, 300, 0);
+	string response = test;
 	// 'response' contains username entered by client;
 	
 	string curr_user = response;
@@ -82,8 +90,11 @@ void *serverHandler (void *dummyPt){
 
 	if(!authenticate_user(response)){
 		message = "User does not exist. Do you want to create a new one? (yes/no): ";
-		send_string(test, message, 300);
-		response = recv_string(test, 300);
+		send(connFd, (void *)message.c_str(), 300, 0);
+		
+		bzero(test, 301);
+		recv(connFd, test, 300, 0);
+		response = test;
 
 		if(response == "yes"){
 			string user_file = "/users.txt";
@@ -91,10 +102,17 @@ void *serverHandler (void *dummyPt){
 			outfile.open(user_file.c_str(), ofstream::app);
 			outfile << curr_user << endl;
 			outfile.close();
+			
+			string group_file = "/groups.txt";
+			group_file = rootDir + group_file;
+			outfile.open(group_file.c_str(), ofstream::app);
+			outfile << curr_group << ":" <<curr_user << endl;
+			outfile.close();
+
 			// check = mkdir(rootDir+"/"+curr_user);
 			curr_dir = curr_dir + "/" + curr_user;
 			if(mkdir(curr_dir.c_str(), 0777) == -1){
-				return closing_seq("Error: Driectory Exists.");
+				return closing_seq("Error: Driectory Exists.", connFd);
 			}
 			string meta_file = rootDir + homeDir + "/" + curr_user + ".d";
 			outfile.open(meta_file.c_str(), ofstream::app);
@@ -103,7 +121,7 @@ void *serverHandler (void *dummyPt){
 			outfile.close();
 		}
 		else{
-			return closing_seq("Closing Connection");
+			return closing_seq("Closing Connection", connFd);
 		}
 	}
 	curr_dir = homeDir+"/"+curr_user;
@@ -113,18 +131,20 @@ void *serverHandler (void *dummyPt){
 
 	// else user name typed exists
 	message = curr_dir + "$ ";
-	send_string(test, message, 300);
+	send(connFd, (void *)message.c_str(), 300, 0);
 
 
 	bool loop = false;
 	while(!loop){
-		response = recv_string(test, 300);
+		bzero(test, 301);
+		recv(connFd, test, 300, 0);
+		string response = test;
 		int pos = response.find(' ');
 		string command = response.substr(0, pos);
 		string argument = response.substr(pos+1);
 		message = "";
 		if(command == "ls"){
-			argument = rootDir + "/" + argument;
+			argument = rootDir + homeDir + "/"+curr_user+"/" + argument;
 			DIR *dr = opendir(argument.c_str());
 			if(dr == NULL){
 				message += "Error: Could not find directory\n";
@@ -136,11 +156,14 @@ void *serverHandler (void *dummyPt){
 					bool not_relative_dir = this_inode!="." && this_inode!="..";
 					if(not_relative_dir){
 						if(getFileExtension(this_inode)!="m" && getFileExtension(this_inode)!="d"){
-							message += this_inode + "\n";
+							message += this_inode + " " + getUserandGroup(argument + "/" + this_inode);
 						}
 					}
 				}
 			}
+		}
+		else if(command == "cd"){
+			
 		}
 		else if(command == "fput"){
 			
@@ -151,9 +174,6 @@ void *serverHandler (void *dummyPt){
 		else if(command == "create_dir"){
 			
 		}
-		else if(command == "cd"){
-			
-		}
 		else if(command == "exit"){
 			break;
 		}
@@ -161,7 +181,7 @@ void *serverHandler (void *dummyPt){
 			
 		}
 		message += curr_dir + "$ ";
-		send_string(test, message, 300);
+		send(connFd, (void *)message.c_str(), 300, 0);
 
 	}
 
@@ -175,6 +195,7 @@ int main(int argc, char* argv[]) {
 	bool loop = false;
 	struct sockaddr_in svrAdd, clntAdd;
 	pthread_t threadA[3];
+	int connFd;
 
 	if (argc < 2){
 		cerr << "Syntax : ./server <port>" << endl;
@@ -219,7 +240,7 @@ int main(int argc, char* argv[]) {
 		else{
 			cout << "Connection Successful" << endl;
 		}
-		pthread_create(&threadA[noThread], NULL, serverHandler, NULL); 
+		pthread_create(&threadA[noThread], NULL, serverHandler, (void *) &connFd); 
 		noThread++;
 	}
 

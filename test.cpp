@@ -6,10 +6,16 @@ using namespace std;
 
 
 
-string getFileExtension(string Name) {
-    int pos = Name.find('.');
-    string sub = Name.substr(pos+1);
-    return sub;
+string getFileExtension(string filename) {
+	// int pos = filename.find('.');
+	// string sub = filename.substr(pos+1);
+	// return sub;
+	string filename_copy(filename);
+	reverse(filename_copy.begin(), filename_copy.end());
+	int pos = filename_copy.find('.');
+	string sub = filename_copy.substr(0,pos);
+	reverse(sub.begin(), sub.end());
+	return sub;
 }
 
 int main(void) 
