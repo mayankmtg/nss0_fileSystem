@@ -7,6 +7,7 @@
 #include <netinet/in.h>
 #include <iostream>
 #include <fstream>
+#include <dirent.h>
 #include <strings.h>
 #include <stdlib.h>
 #include <string>
@@ -44,6 +45,14 @@ bool authenticate_user(string curr_user){
 	return false;
 
 }
+
+
+string getFileExtension(string Name) {
+	int pos = Name.find('.');
+	string sub = Name.substr(pos+1);
+	return sub;
+}
+
 
 void *closing_seq (string message){
 	char test[300];
@@ -98,36 +107,62 @@ void *serverHandler (void *dummyPt){
 		}
 	}
 	curr_dir = homeDir+"/"+curr_user;
+	// curr_dir contains path like /simple-home/user
+
+
+
 	// else user name typed exists
 	message = curr_dir + "$ ";
 	send_string(test, message, 300);
 
 
 	bool loop = false;
-	while(!loop){	
+	while(!loop){
 		response = recv_string(test, 300);
-
-		if(response == "ls"){
-			cout << "tested" <<endl;
+		int pos = response.find(' ');
+		string command = response.substr(0, pos);
+		string argument = response.substr(pos+1);
+		message = "";
+		if(command == "ls"){
+			argument = rootDir + "/" + argument;
+			DIR *dr = opendir(argument.c_str());
+			if(dr == NULL){
+				message += "Error: Could not find directory\n";
+			}
+			else{
+				struct dirent *de;
+				while ((de = readdir(dr)) != NULL){
+					string this_inode(de->d_name);
+					bool not_relative_dir = this_inode!="." && this_inode!="..";
+					if(not_relative_dir){
+						if(getFileExtension(this_inode)!="m" && getFileExtension(this_inode)!="d"){
+							message += this_inode + "\n";
+						}
+					}
+				}
+			}
 		}
-		else if(response == "fput"){
-			cout << response <<endl;
+		else if(command == "fput"){
+			
 		}
-		else if(response == "fget"){
-			cout << response <<endl;
+		else if(command == "fget"){
+			
 		}
-		else if(response == "create_dir"){
-			cout << response <<endl;
+		else if(command == "create_dir"){
+			
 		}
-		else if(response == "cd"){
-			cout << response <<endl;
+		else if(command == "cd"){
+			
 		}
-		else if(response == "exit"){
+		else if(command == "exit"){
 			break;
 		}
 		else{
-			cout << response << endl;
+			
 		}
+		message += curr_dir + "$ ";
+		send_string(test, message, 300);
+
 	}
 
 	cout << "Closing thread and conn" << endl;
