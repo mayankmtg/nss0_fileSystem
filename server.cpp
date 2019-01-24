@@ -17,24 +17,97 @@
 using namespace std;
 
 //static int connFd;
-static string rootDir = "/home/mayank/Sem-8/NSS/nss0_fileSystem/root";
+static string rootDir = "/home/mayank/Sem-8/NSS/nss0_fileSystem/direc/root";
 static string homeDir = "/simple_home";
 
 
-bool authenticate_user(string curr_user){
+bool authenticate_user(string currUser){
 	ifstream infile;
-	string user_file = "/users.txt";
+	string user_file = "/../users.txt";
 	user_file = rootDir + user_file;
 	infile.open(user_file.c_str());
 	string userLine;
 	while(infile >> userLine){
-		if(userLine == curr_user){
+		if(userLine == currUser){
 			return true;
 		}
 	}
+	infile.close();
 	return false;
 }
 
+bool addUserToUserFile(string username){
+	fstream outfile;
+
+	string user_file = rootDir + "/../users.txt";
+	outfile.open(user_file.c_str(), ofstream::app);
+	outfile << username << endl;
+	outfile.close();
+	return true;
+}
+
+bool addUserToGroupFile(string username, string groupname){
+	ifstream infile;
+	string group_file = rootDir + "/../groups.txt";
+	infile.open(group_file.c_str());
+	string fileLine;
+	cout << "mtg"<< endl;
+	string newString="";
+	bool groupFound = false;
+	while(infile >> fileLine){
+		cout <<fileLine<< endl;
+
+		if( fileLine.substr(0,fileLine.find(':')) == groupname ){
+			groupFound = true;
+			newString += fileLine + "," + username + "\n";
+		}
+		else{
+			newString +=fileLine + "\n";
+		}
+	}
+	infile.close();
+	fstream outfile;
+	if(groupFound==false){
+		outfile.open(group_file.c_str(), ofstream::app);
+		outfile << groupname << ":" <<username << endl;
+	}
+	else{
+		outfile.open(group_file.c_str());
+		outfile << newString;
+	}
+	outfile.close();
+	return true;
+}
+
+bool addUserToSimpleHome(string username, string groupname){
+	string userDir = rootDir + homeDir + "/" + username;
+	if(mkdir(userDir.c_str(), 0777) == -1){
+		return false;
+	}
+	string meta_file = userDir + ".d";
+	fstream outfile;
+	outfile.open(meta_file.c_str(), ofstream::app);
+	outfile << username << endl;
+	outfile << groupname << endl;
+	outfile.close();
+	return true;
+}
+
+bool createNewUser(string username, string groupname){
+	bool addToUser = addUserToUserFile(username);
+	if(!addToUser){
+		return false;
+	}
+	bool addToGroup = addUserToGroupFile(username, groupname);
+	if(!addToGroup){
+		return false;
+	}
+	bool addToHome = addUserToSimpleHome(username, groupname);
+	if(!addToHome){
+		return false;
+	}
+	return true;
+}
 
 string getFileExtension(string filename) {
 	string filename_copy(filename);
@@ -55,17 +128,119 @@ void *closing_seq (string message, int connFd){
 	return returnVal;
 }
 
-string getUserandGroup(string filename){
+string getUserandGroupForFile(string metafilepath){
 	string returnString="";
 	ifstream infile;
-	filename = filename + ".m";
-	infile.open(filename.c_str());
+	metafilepath = metafilepath + ".m";
+	infile.open(metafilepath.c_str());
 	string userLine;
 	while(infile >> userLine){
 		returnString +=userLine + " ";
 	}
-	returnString+="\n";
-	return returnString;
+	infile.close();
+	return returnString.substr(0,returnString.length()-1);
+}
+
+string getUserandGroupForDirec(string metafilepath){
+	string returnString="";
+	ifstream infile;
+	metafilepath = metafilepath + ".d";
+	infile.open(metafilepath.c_str());
+	string userLine;
+	while(infile >> userLine){
+		returnString +=userLine + " ";
+	}
+	infile.close();
+	return returnString.substr(0,returnString.length()-1);
+}
+
+// path is either like /simple_home/user/... or like direc1/direc2/...
+// returns the complete path with rootDir concatenated
+string getCorrectedPath(string currDirec, string path){
+	if(path[0]=='/'){
+		path = rootDir + path; // absolute path
+	}
+	else{
+		path = currDirec + "/" + path; // relative path
+	}
+	char buf[300];
+	char *res = realpath(path.c_str(), buf);
+	if(res){
+		string returnPath = buf;
+		return returnPath;
+    }
+	else{
+        return "Error";
+    }
+
+}
+
+string getDispPath(string path){
+	char buf[300];
+	char *res = realpath(path.c_str(), buf);
+	if(res){
+        string returnPath = buf;
+		return returnPath.substr(rootDir.length(), returnPath.length());
+    }
+	else{
+        return "Error";
+    }
+}
+
+bool userBelongsToGroup(string username, string groupname){
+	if(groupname==("all")){
+		return true;
+	}
+	else{
+		ifstream infile;
+		string group_file = rootDir + "/../groups.txt";
+		infile.open(group_file.c_str());
+		string fileLine;
+		while(infile >> fileLine){
+			if( fileLine.substr(0,fileLine.find(':')) == groupname ){
+				string allGroupUsers = fileLine.substr(fileLine.find(':')+1);
+				while(allGroupUsers.find(',') != string::npos){
+					int pos = allGroupUsers.find(',');
+					if(username == allGroupUsers.substr(0,allGroupUsers.find(','))){
+						infile.close();
+						return true;
+					}
+					allGroupUsers = allGroupUsers.substr(allGroupUsers.find(',')+1);
+				}
+				if(username == allGroupUsers){
+					infile.close();
+					return true;
+				}
+				else{
+					infile.close();
+					return false;
+				}
+			}
+		}
+		infile.close();
+	}
+	return false;
+
+
+}
+bool fileReadAllowed(string currUser, string currGroup, string filepath){
+	string usergroup = getUserandGroupForDirec(filepath);
+	string fileUser = usergroup.substr(0, usergroup.find(' '));
+	string fileGroup= usergroup.substr(usergroup.find(' ')+1);
+	
+	if(fileUser == currUser){
+		return true;
+	}
+	else if(fileGroup == currGroup){
+		return true;
+	}
+	else if(userBelongsToGroup(currUser, fileGroup)){
+		return true;
+	}
+	else{
+		return false;
+	}
+
 }
 
 void *serverHandler (void* dummyPt){
@@ -75,18 +250,18 @@ void *serverHandler (void* dummyPt){
 	string message="Enter your username: ";
 	int connFd =  *((int *)dummyPt);
 	send(connFd, (void *)message.c_str(), 300, 0);
-	string curr_dir = rootDir + homeDir;
 	
 	// 'response' received from the server
 	bzero(test, 301);
 	recv(connFd, test, 300, 0);
 	string response = test;
+	string threadUser = response;
+	string threadGroup= response;
 	// 'response' contains username entered by client;
 	
-	string curr_user = response;
-	string curr_group = response; 
-	fstream outfile;
-	ifstream infile;
+	string currDirec;
+	string currUser;
+	string currGroup;
 
 	if(!authenticate_user(response)){
 		message = "User does not exist. Do you want to create a new one? (yes/no): ";
@@ -97,41 +272,32 @@ void *serverHandler (void* dummyPt){
 		response = test;
 
 		if(response == "yes"){
-			string user_file = "/users.txt";
-			user_file = rootDir + user_file;
-			outfile.open(user_file.c_str(), ofstream::app);
-			outfile << curr_user << endl;
-			outfile.close();
-			
-			string group_file = "/groups.txt";
-			group_file = rootDir + group_file;
-			outfile.open(group_file.c_str(), ofstream::app);
-			outfile << curr_group << ":" <<curr_user << endl;
-			outfile.close();
-
-			// check = mkdir(rootDir+"/"+curr_user);
-			curr_dir = curr_dir + "/" + curr_user;
-			if(mkdir(curr_dir.c_str(), 0777) == -1){
-				return closing_seq("Error: Driectory Exists.", connFd);
+			bool newUserBool = createNewUser(threadUser, threadGroup);
+			if(newUserBool){
+				currUser = threadUser;
+				currGroup= threadGroup;
+				currDirec = rootDir + homeDir + "/" + threadUser;
 			}
-			string meta_file = rootDir + homeDir + "/" + curr_user + ".d";
-			outfile.open(meta_file.c_str(), ofstream::app);
-			outfile << curr_user << endl;
-			outfile << curr_group << endl;
-			outfile.close();
+			else{
+				closing_seq("Error creating user", connFd);
+			}
 		}
 		else{
 			return closing_seq("Closing Connection", connFd);
 		}
 	}
-	curr_dir = homeDir+"/"+curr_user;
-	// curr_dir contains path like /simple-home/user
-
-
-
-	// else user name typed exists
-	message = curr_dir + "$ ";
-	send(connFd, (void *)message.c_str(), 300, 0);
+	else{
+		currUser = threadUser;
+		currGroup= threadGroup;
+		currDirec= rootDir + homeDir + "/" + threadUser;
+	}
+	if(getDispPath(currDirec)!="Error"){
+		message = getDispPath(currDirec) + "$ ";
+		send(connFd, (void *)message.c_str(), 300, 0);
+	}
+	else{
+		return closing_seq("Error in Prompt", connFd);
+	}
 
 
 	bool loop = false;
@@ -144,26 +310,50 @@ void *serverHandler (void* dummyPt){
 		string argument = response.substr(pos+1);
 		message = "";
 		if(command == "ls"){
-			argument = rootDir + homeDir + "/"+curr_user+"/" + argument;
-			DIR *dr = opendir(argument.c_str());
-			if(dr == NULL){
+			argument = getCorrectedPath(currDirec, argument);
+			if(argument=="Error"){
 				message += "Error: Could not find directory\n";
 			}
+			else if(argument.length() < rootDir.length()){
+				message += "Error: Unauthorised Access\n";
+			}
 			else{
-				struct dirent *de;
-				while ((de = readdir(dr)) != NULL){
-					string this_inode(de->d_name);
-					bool not_relative_dir = this_inode!="." && this_inode!="..";
-					if(not_relative_dir){
-						if(getFileExtension(this_inode)!="m" && getFileExtension(this_inode)!="d"){
-							message += this_inode + " " + getUserandGroup(argument + "/" + this_inode);
+				if(fileReadAllowed(currUser, currGroup, argument)){
+					DIR *dr = opendir(argument.c_str());
+					struct dirent *de;
+					while ((de = readdir(dr)) != NULL){
+						string this_inode(de->d_name);
+						bool not_relative_dir = this_inode!="." && this_inode!="..";
+						if(not_relative_dir){
+							if(getFileExtension(this_inode)!="m" && getFileExtension(this_inode)!="d"){
+								string inode_path = argument + "/" + this_inode;
+								struct stat statStruct;
+								message += this_inode + " " + getUserandGroupForFile(inode_path) + getUserandGroupForDirec(inode_path) + "\n";
+							}
 						}
 					}
+				}
+				else{
+					message += "Error: No permissions to read this directory\n";
 				}
 			}
 		}
 		else if(command == "cd"){
-			
+			argument = getCorrectedPath(currDirec, argument);
+			if(argument=="Error"){
+				message += "Error: Could not find directory\n";
+			}
+			else if(argument.length() < rootDir.length()){
+				message += "Error: Unauthorised Access\n";
+			}
+			else{
+				if(fileReadAllowed(currUser, currGroup, argument)){
+					currDirec = argument;
+				}
+				else{
+					message += "Error: No permissions to chaneg to this directory\n";
+				}
+			}
 		}
 		else if(command == "fput"){
 			
@@ -180,7 +370,7 @@ void *serverHandler (void* dummyPt){
 		else{
 			
 		}
-		message += curr_dir + "$ ";
+		message += getDispPath(currDirec) + "$ ";
 		send(connFd, (void *)message.c_str(), 300, 0);
 
 	}
