@@ -36,6 +36,21 @@ bool authenticate_user(string currUser){
 	return false;
 }
 
+bool authenticate_group(string currGroup){
+	ifstream infile;
+	string groupFile = "/../groups.txt";
+	groupFile = rootDir + groupFile;
+	infile.open(groupFile.c_str());
+	string groupLine;
+	while(infile >> groupLine){
+		if(groupLine.substr(0,groupLine.find(':')) == currGroup){
+			return true;
+		}
+	}
+	infile.close();
+	return false;
+}
+
 bool addUserToUserFile(string username){
 	fstream outfile;
 
@@ -51,7 +66,6 @@ bool addUserToGroupFile(string username, string groupname){
 	string group_file = rootDir + "/../groups.txt";
 	infile.open(group_file.c_str());
 	string fileLine;
-	cout << "mtg"<< endl;
 	string newString="";
 	bool groupFound = false;
 	while(infile >> fileLine){
@@ -174,6 +188,44 @@ string getCorrectedPath(string currDirec, string path){
     }
 
 }
+string getFilePathDirectory(string currDirec, string path){
+	if(path[0]=='/'){
+		path = rootDir + path;
+	}
+	else{
+		path = currDirec+ "/" + path;
+	}
+	string filename_copy(path);
+	reverse(filename_copy.begin(), filename_copy.end());
+	int pos = filename_copy.find('/');
+	string sub = filename_copy.substr(pos+1);
+	reverse(sub.begin(), sub.end());
+	char buf[300];
+	char *res = realpath(sub.c_str(), buf);
+	if(res){
+		string returnPath = buf;
+		return returnPath;
+	}
+	else{
+		return "Error";
+	}
+	return sub;
+}
+
+string getFilePathName(string currDirec, string path){
+	if(path[0]=='/'){
+		path = rootDir + path;
+	}
+	else{
+		path = currDirec+ "/" + path;
+	}
+	string filename_copy(path);
+	reverse(filename_copy.begin(), filename_copy.end());
+	int pos = filename_copy.find('/');
+	string sub = filename_copy.substr(0,pos);
+	reverse(sub.begin(), sub.end());
+	return sub;
+}
 
 string getDispPath(string path){
 	char buf[300];
@@ -223,7 +275,7 @@ bool userBelongsToGroup(string username, string groupname){
 
 
 }
-bool fileReadAllowed(string currUser, string currGroup, string filepath){
+bool direcReadAllowed(string currUser, string currGroup, string filepath){
 	string usergroup = getUserandGroupForDirec(filepath);
 	string fileUser = usergroup.substr(0, usergroup.find(' '));
 	string fileGroup= usergroup.substr(usergroup.find(' ')+1);
@@ -241,6 +293,62 @@ bool fileReadAllowed(string currUser, string currGroup, string filepath){
 		return false;
 	}
 
+}
+
+bool direcWriteAllowed(string currUser, string filepath){
+	string usergroup = getUserandGroupForDirec(filepath);
+	string fileUser = usergroup.substr(0, usergroup.find(' '));
+	
+	if(fileUser == currUser){
+		return true;
+	}
+	else{
+		return false;
+	}
+}
+bool fileReadAllowed(string currUser, string currGroup, string filepath){
+	string usergroup = getUserandGroupForFile(filepath);
+	string fileUser = usergroup.substr(0, usergroup.find(' '));
+	string fileGroup= usergroup.substr(usergroup.find(' ')+1);
+	
+	if(fileUser == currUser){
+		return true;
+	}
+	else if(fileGroup == currGroup){
+		return true;
+	}
+	else if(userBelongsToGroup(currUser, fileGroup)){
+		return true;
+	}
+	else{
+		return false;
+	}
+
+}
+
+bool fileWriteAllowed(string currUser, string filepath){
+	string usergroup = getUserandGroupForFile(filepath);
+	string fileUser = usergroup.substr(0, usergroup.find(' '));
+	
+	if(fileUser == currUser){
+		return true;
+	}
+	else{
+		return false;
+	}
+}
+
+bool filePathExists(string pathname){
+	std::ifstream infile(pathname.c_str());
+    return infile.good();
+}
+
+
+void appendToFile(string filename, string content){
+	fstream outfile;
+	outfile.open(filename.c_str(), ofstream::app);
+	outfile << content;
+	outfile.close();
 }
 
 void *serverHandler (void* dummyPt){
@@ -318,7 +426,7 @@ void *serverHandler (void* dummyPt){
 				message += "Error: Unauthorised Access\n";
 			}
 			else{
-				if(fileReadAllowed(currUser, currGroup, argument)){
+				if(direcReadAllowed(currUser, currGroup, argument)){
 					DIR *dr = opendir(argument.c_str());
 					struct dirent *de;
 					while ((de = readdir(dr)) != NULL){
@@ -327,7 +435,6 @@ void *serverHandler (void* dummyPt){
 						if(not_relative_dir){
 							if(getFileExtension(this_inode)!="m" && getFileExtension(this_inode)!="d"){
 								string inode_path = argument + "/" + this_inode;
-								struct stat statStruct;
 								message += this_inode + " " + getUserandGroupForFile(inode_path) + getUserandGroupForDirec(inode_path) + "\n";
 							}
 						}
@@ -347,16 +454,76 @@ void *serverHandler (void* dummyPt){
 				message += "Error: Unauthorised Access\n";
 			}
 			else{
-				if(fileReadAllowed(currUser, currGroup, argument)){
+				if(direcReadAllowed(currUser, currGroup, argument)){
 					currDirec = argument;
 				}
 				else{
-					message += "Error: No permissions to chaneg to this directory\n";
+					message += "Error: No permissions to change to this directory\n";
 				}
 			}
 		}
 		else if(command == "fput"){
-			
+			string extractDirec = getFilePathDirectory(currDirec, argument);
+			string extractName = getFilePathName(currDirec, argument);
+			argument = extractDirec + "/" + extractName;
+			if(extractDirec == "Error"){
+				message += "Error: Incorrect path to file\n";
+			}
+			else if(extractDirec.length() < rootDir.length()){
+				message += "Error: Unauthorised Access\n";
+			}
+			else if(filePathExists(argument)){
+				if(fileWriteAllowed(currUser, argument)){
+					message = "Input Stream. Q to Quit.\n";
+					send(connFd, (void *)message.c_str(), 300, 0);
+					bzero(test, 301);
+					recv(connFd, test, 300, 0);
+					response = test;
+					appendToFile(argument,response);
+					message = "";
+				}
+				else{
+					message = "Error: No permissions to write to this file\n";
+				}
+			}
+			else if(direcWriteAllowed(currUser, extractDirec)){
+				string metaData = "";
+				message = "";
+				while(1){
+					message += "Enter File Owner: ";
+					send(connFd, (void *)message.c_str(), 300, 0);
+					bzero(test, 301);
+					recv(connFd, test, 300, 0);
+					response = test;
+					if(authenticate_user(response)){
+						metaData+=response + "\n";
+					}
+
+					message = "Enter File Group: ";
+					send(connFd, (void *)message.c_str(), 300, 0);
+					bzero(test, 301);
+					recv(connFd, test, 300, 0);
+					response = test;
+					if(authenticate_group(response)){
+						metaData+=response + "\n";
+						break;
+					}
+					metaData = "";
+					message = "Error: does not exist\n";
+				}
+				appendToFile(argument+".m", metaData);
+
+				message = "Input Stream. Q to Quit.\n";
+				send(connFd, (void *)message.c_str(), 300, 0);
+				bzero(test, 301);
+				recv(connFd, test, 300, 0);
+				response = test;
+				appendToFile(argument,response);
+				message = "";
+			}
+			else{
+				message += "Error: No write permissions for the directory\n";
+			}
 		}
 		else if(command == "fget"){
 			

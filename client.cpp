@@ -85,8 +85,20 @@ int main (int argc, char* argv[]){
 	//send 'message' to server
 	string message;
 	while(1){
-		cin.getline(test, 300);
-		message = test;
+		if(response == "Input Stream. Q to Quit.\n"){
+			string line;
+			message="";
+			while (getline(cin, line)){
+				if (line == "Q"){
+					break;
+				}
+				message += line + "\n";
+			}
+		}
+		else{
+			cin.getline(test, 300);
+			message = test;
+		}
 		send(listenFd, (void *)message.c_str(), 300, 0);
 		// write(listenFd, test, strlen(test));
 		// message=test;

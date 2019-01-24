@@ -1,16 +1,17 @@
 #include <bits/stdc++.h>
-#include <unistd.h>
 using namespace std;
 int main(){
-    string my_str;
-    cin >> my_str;
-    while(my_str.find(',') != string::npos){
-        int pos = my_str.find(',');
-        cout << my_str.substr(0,my_str.find(','))<< endl;
-        my_str = my_str.substr(my_str.find(',')+1);
-        usleep(1000000);
+    fstream outfile;
 
+	string user_file = "/home/mayank/Sem-8/NSS/nss0_fileSystem/random.txt";
+	outfile.open(user_file.c_str(), ofstream::app);
+    string line;
+    while (getline(cin, line)){
+        if (line == "Q"){
+            break;
+        }
+        outfile << line << endl;
     }
-    cout << my_str<< endl;
+	outfile.close();
     return 0;
 }
