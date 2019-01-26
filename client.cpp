@@ -75,6 +75,7 @@ int main (int argc, char* argv[]){
 	}
 	// else connected
 	char test[300];
+	cout << "Ctrl + C to exit"<< endl;
 	// collect 'response' from server
 	string response;
 	bzero(test, 301);
@@ -102,10 +103,6 @@ int main (int argc, char* argv[]){
 		send(listenFd, (void *)message.c_str(), 300, 0);
 		// write(listenFd, test, strlen(test));
 		// message=test;
-		if(message=="exit"){
-			cout << "Closing Connection"<< endl;
-			break;
-		}
 		bzero(test, 301);
 		recv(listenFd, test, 300, 0);
 		response = test;

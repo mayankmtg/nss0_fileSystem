@@ -1,4 +1,2 @@
 mtg
-amit
 pulkit
-dev

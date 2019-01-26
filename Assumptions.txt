@@ -2,6 +2,8 @@ Any file name has a single '.'
 Directory names cannot have any '.'
 If a user does not exits then the server prompts for the creation of a new one
 
+Each of the user's username has to be unique (thus avoiding the use of userID).
+
 No file or directory can have names ending with '.m' or '.d'
 
 ls takes exactly one argument (the directory path absolute or relative)
@@ -13,6 +15,7 @@ Check for extra spaces and tabs in the input from client and remove them
 
 cd to a directory if we have read permissions
 
-
 fput quit from file input output using 'Q\n'
 fput to directory only when we have write permissions
+fput to a new file takes owner and group first time and no other time
+fput to a new file takes input from the user creating the file regardless of the owner of the file.

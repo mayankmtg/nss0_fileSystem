@@ -69,7 +69,6 @@ bool addUserToGroupFile(string username, string groupname){
 	string newString="";
 	bool groupFound = false;
 	while(infile >> fileLine){
-		cout <<fileLine<< endl;
 
 		if( fileLine.substr(0,fileLine.find(':')) == groupname ){
 			groupFound = true;
@@ -226,6 +225,17 @@ string getFilePathName(string currDirec, string path){
 	reverse(sub.begin(), sub.end());
 	return sub;
 }
+string getFileContents(string filename){
+	ifstream infile;
+	infile.open(filename.c_str());
+	string userLine;
+	string returnString="";
+	while(getline(infile, userLine)){
+		returnString+=userLine + "\n";
+	}
+	infile.close();
+	return returnString;
+}
 
 string getDispPath(string path){
 	char buf[300];
@@ -341,6 +351,17 @@ bool fileWriteAllowed(string currUser, string filepath){
 bool filePathExists(string pathname){
 	std::ifstream infile(pathname.c_str());
     return infile.good();
+}
+
+bool direcPathExists(string pathname){
+	DIR* dir = opendir(pathname.c_str());
+	if (dir){
+		closedir(dir);
+		return true;
+	}
+	else{
+		return false;
+	}
 }
 
 
@@ -526,16 +547,79 @@ void *serverHandler (void* dummyPt){
 			}
 		}
 		else if(command == "fget"){
-			
+			string extractDirec = getFilePathDirectory(currDirec, argument);
+			string extractName = getFilePathName(currDirec, argument);
+			argument = extractDirec + "/" + extractName;
+			if(extractDirec == "Error"){
+				message += "Error: Incorrect path to file\n";
+			}
+			else if(extractDirec.length() < rootDir.length()){
+				message += "Error: Unauthorised Access\n";
+			}
+			else if(filePathExists(argument)){
+				if(fileReadAllowed(currUser,currGroup, argument)){
+					message += getFileContents(argument);
+				}
+				else{
+					message += "Error: No permissions to read this file\n";
+				}
+			}
+			else{
+				message += "Error: No such file exists\n";
+			}
 		}
-		else if(command == "create_dir"){
+		else if(command == "mkdir"){
+			string extractDirec = getFilePathDirectory(currDirec, argument);
+			string extractName = getFilePathName(currDirec, argument);
+			argument = extractDirec + "/" + extractName;
+			if(extractDirec=="Error"){
+				message += "Error: Could not find directory\n";
+			}
+			else if(extractDirec.length() < rootDir.length()){
+				message += "Error: Unauthorised Access\n";
+			}
+			else if(direcPathExists(argument)){
+				message += "Error: Invalid directory name\n";
+			}
+			else if(direcWriteAllowed(currUser, extractDirec)){
+				if(mkdir(argument.c_str(), 0777) == -1){
+					message += "Error: Unable to make directory\n";
+				}
+				else{
+					string metaData = "";
+					message = "";
+					while(1){
+						message += "Enter Directory Owner: ";
+						send(connFd, (void *)message.c_str(), 300, 0);
+						bzero(test, 301);
+						recv(connFd, test, 300, 0);
+						response = test;
+						if(authenticate_user(response)){
+							metaData+=response + "\n";
+						}
+						message = "Enter Directory Group: ";
+						send(connFd, (void *)message.c_str(), 300, 0);
+						bzero(test, 301);
+						recv(connFd, test, 300, 0);
+						response = test;
+						if(authenticate_group(response)){
+							metaData+=response + "\n";
+							break;
+						}
+						metaData = "";
+						message = "Error: does not exist\n";
+					}
+					appendToFile(argument+".d", metaData);
+					message = "";
+				}
+			}
+			else{
+				message += "Error: No permissions to create directory here\n";
+			}
 			
-		}
-		else if(command == "exit"){
-			break;
 		}
 		else{
-			
+			message += "No such command\n";
 		}
 		message += getDispPath(currDirec) + "$ ";
 		send(connFd, (void *)message.c_str(), 300, 0);
