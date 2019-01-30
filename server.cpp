@@ -520,20 +520,29 @@ void *serverHandler (void* dummyPt){
 				string metaData = "";
 				message = "";
 				while(1){
-					message += "Enter File Owner: ";
+					message += "Enter File Owner (d for default): ";
+					string usergroup = getUserandGroupForDirec(extractDirec);
+					string fileUser = usergroup.substr(0, usergroup.find(' '));
 					send(connFd, (void *)message.c_str(), 300, 0);
 					bzero(test, 301);
 					recv(connFd, test, 300, 0);
 					response = test;
+					if(response == "d"){
+						response = fileUser;
+					}
 					if(authenticate_user(response)){
 						metaData+=response + "\n";
 					}
 
-					message = "Enter File Group: ";
+					message = "Enter File Group (d for default): ";
+					string fileGroup= usergroup.substr(usergroup.find(' ')+1);
 					send(connFd, (void *)message.c_str(), 300, 0);
 					bzero(test, 301);
 					recv(connFd, test, 300, 0);
 					response = test;
+					if(response == "d"){
+						response = fileGroup;
+					}
 					if(authenticate_group(response)){
 						metaData+=response + "\n";
 						break;
@@ -598,25 +607,34 @@ void *serverHandler (void* dummyPt){
 					string metaData = "";
 					message = "";
 					while(1){
-						message += "Enter Directory Owner: ";
+						message += "Enter Directory Owner (d for default): ";
+						string usergroup = getUserandGroupForDirec(extractDirec);
+						string fileUser = usergroup.substr(0, usergroup.find(' '));
 						send(connFd, (void *)message.c_str(), 300, 0);
 						bzero(test, 301);
 						recv(connFd, test, 300, 0);
 						response = test;
+						if(response == "d"){
+							response = fileUser;
+						}
 						if(authenticate_user(response)){
 							metaData+=response + "\n";
 						}
-						message = "Enter Directory Group: ";
+						message = "Enter Directory Group (d for default): ";
+						string fileGroup= usergroup.substr(usergroup.find(' ')+1);
 						send(connFd, (void *)message.c_str(), 300, 0);
 						bzero(test, 301);
 						recv(connFd, test, 300, 0);
 						response = test;
+						if(response == "d"){
+							response = fileGroup;
+						}
 						if(authenticate_group(response)){
 							metaData+=response + "\n";
 							break;
 						}
 						metaData = "";
-						message = "Error: does not exist\n";
+						message = "Error: Does not exist\n";
 					}
 					appendToFile(argument+".d", metaData);
 					message = "";

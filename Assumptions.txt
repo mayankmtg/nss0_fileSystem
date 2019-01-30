@@ -34,3 +34,4 @@ Directory enumeration
 
 TODOs:
 Multiple user logins
+Default Option for file permissions
