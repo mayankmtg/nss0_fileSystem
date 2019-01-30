@@ -6,6 +6,8 @@ Each of the user's username has to be unique (thus avoiding the use of userID).
 
 No file or directory can have names ending with '.m' or '.d'
 
+Arguments cannot have size more than 294
+
 ls takes exactly one argument (the directory path absolute or relative)
 ls command runs on directory without read permissions (listing can be done.)
 / and simple_home have group name associated with all which allows all users to read the directory
@@ -19,3 +21,16 @@ fput quit from file input output using 'Q\n'
 fput to directory only when we have write permissions
 fput to a new file takes owner and group first time and no other time
 fput to a new file takes input from the user creating the file regardless of the owner of the file.
+
+
+
+Vulnerabilities
+
+Buffer
+Login brute force
+Directory enumeration
+
+
+
+TODOs:
+Multiple user logins

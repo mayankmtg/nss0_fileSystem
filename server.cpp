@@ -446,6 +446,9 @@ void *serverHandler (void* dummyPt){
 			else if(argument.length() < rootDir.length()){
 				message += "Error: Unauthorised Access\n";
 			}
+			else if(argument.substr(0,rootDir.length()) != rootDir ){
+				message += "Error: Unauthorised Access\n";
+			}
 			else{
 				if(direcReadAllowed(currUser, currGroup, argument)){
 					DIR *dr = opendir(argument.c_str());
@@ -474,6 +477,9 @@ void *serverHandler (void* dummyPt){
 			else if(argument.length() < rootDir.length()){
 				message += "Error: Unauthorised Access\n";
 			}
+			else if(argument.substr(0,rootDir.length()) != rootDir ){
+				message += "Error: Unauthorised Access\n";
+			}
 			else{
 				if(direcReadAllowed(currUser, currGroup, argument)){
 					currDirec = argument;
@@ -492,6 +498,9 @@ void *serverHandler (void* dummyPt){
 			}
 			else if(extractDirec.length() < rootDir.length()){
 				message += "Error: Unauthorised Access\n";
+			}
+			else if(getFileExtension(extractName)==".m" || getFileExtension(extractName)==".d"){
+				message += "Error: File cannot have .m or .d extension";
 			}
 			else if(filePathExists(argument)){
 				if(fileWriteAllowed(currUser, argument)){
