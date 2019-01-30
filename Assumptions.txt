@@ -31,7 +31,6 @@ Login brute force
 Directory enumeration
 
 
-
 TODOs:
-Multiple user logins
-Default Option for file permissions
+Connection closing sequence
+Multithreaded server login

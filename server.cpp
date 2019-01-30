@@ -6,6 +6,7 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <iostream>
+#include <list>
 #include <fstream>
 #include <dirent.h>
 #include <strings.h>
@@ -19,7 +20,7 @@ using namespace std;
 //static int connFd;
 static string rootDir = "/home/mayank/Sem-8/NSS/nss0_fileSystem/direc/root";
 static string homeDir = "/simple_home";
-
+static list<string> loggedUsers;
 
 bool authenticate_user(string currUser){
 	ifstream infile;
@@ -373,6 +374,7 @@ void appendToFile(string filename, string content){
 }
 
 void *serverHandler (void* dummyPt){
+	bool loop = false;
 	cout << "Thread No: " << pthread_self() << endl;
 	char test[300];
 	// 'message' to be sent to the server
@@ -415,9 +417,14 @@ void *serverHandler (void* dummyPt){
 			return closing_seq("Closing Connection", connFd);
 		}
 	}
+	else if(find(loggedUsers.begin(), loggedUsers.end(), threadUser)!= loggedUsers.end()){
+		// user had already logged in
+		return closing_seq("User already logged in", connFd);
+	}
 	else{
 		currUser = threadUser;
 		currGroup= threadGroup;
+		loggedUsers.push_back(threadUser);
 		currDirec= rootDir + homeDir + "/" + threadUser;
 	}
 	if(getDispPath(currDirec)!="Error"){
@@ -429,7 +436,6 @@ void *serverHandler (void* dummyPt){
 	}
 
 
-	bool loop = false;
 	while(!loop){
 		bzero(test, 301);
 		recv(connFd, test, 300, 0);
