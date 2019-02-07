@@ -26,8 +26,8 @@ fput to a new file takes input from the user creating the file regardless of the
 
 Vulnerabilities
 
-Buffer
 Login brute force
+
 Directory enumeration
 
 
